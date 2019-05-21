@@ -24,6 +24,26 @@ var (
 	serviceNow    ServiceNow
 )
 
+// Config - ServiceNow webhook configuration
+type Config struct {
+	ServiceNow      ServiceNowConfig      `yaml:"service_now"`
+	DefaultIncident DefaultIncidentConfig `yaml:"default_incident"`
+}
+
+// ServiceNowConfig - ServiceNow instance configuration
+type ServiceNowConfig struct {
+	InstanceName string `yaml:"instance_name"`
+	UserName     string `yaml:"user_name"`
+	Password     string `yaml:"password"`
+}
+
+// DefaultIncidentConfig - Default configuration for an incident
+type DefaultIncidentConfig struct {
+	AssignmentGroup string      `json:"assignment_group"`
+	Impact          json.Number `json:"impact"`
+	Urgency         json.Number `json:"urgency"`
+}
+
 // JSONResponse is the Webhook http response
 type JSONResponse struct {
 	Status  int
