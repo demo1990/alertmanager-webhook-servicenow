@@ -20,6 +20,11 @@ func (mock *MockedSnClient) CreateIncident(incident Incident) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
+func (mock *MockedSnClient) GetIncident(params map[string]string) (string, error) {
+	args := mock.Called(params)
+	return args.String(0), args.Error(1)
+}
+
 func TestWebhookHandler_OK(t *testing.T) {
 	snClientMock := new(MockedSnClient)
 	serviceNow = snClientMock

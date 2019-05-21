@@ -34,6 +34,7 @@ type Incident struct {
 // ServiceNow interface
 type ServiceNow interface {
 	CreateIncident(incident Incident) (string, error)
+	GetIncident(params map[string]string) (string, error)
 }
 
 // ServiceNowClient is the interface to a ServiceNow instance
@@ -66,7 +67,7 @@ func NewServiceNowClient(instanceName string, userName string, password string) 
 
 // Create a table item in ServiceNow from a post body
 func (snClient *ServiceNowClient) create(table string, body []byte) (string, error) {
-	log.Infof("Creating a ServiceNow %s", table)
+	log.Infof("Create a ServiceNow %s", table)
 	url := fmt.Sprintf(tableAPI, snClient.baseURL, table)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
@@ -74,6 +75,30 @@ func (snClient *ServiceNowClient) create(table string, body []byte) (string, err
 		return "", err
 	}
 
+	return snClient.doRequest(req)
+}
+
+// get a table item from ServiceNow using a map of arguments
+func (snClient *ServiceNowClient) get(table string, params map[string]string) (string, error) {
+	log.Infof("Get a ServiceNow %s", table)
+	url := fmt.Sprintf(tableAPI, snClient.baseURL, table)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.Errorf("Error creating the request. %s", err)
+		return "", err
+	}
+
+	q := req.URL.Query()
+	for key, val := range params {
+		q.Add(key, val)
+	}
+	req.URL.RawQuery = q.Encode()
+
+	return snClient.doRequest(req)
+}
+
+// doRequest will do the given ServiceNow request and return response as string
+func (snClient *ServiceNowClient) doRequest(req *http.Request) (string, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", snClient.authHeader)
 	resp, err := snClient.client.Do(req)
@@ -109,6 +134,18 @@ func (snClient *ServiceNowClient) CreateIncident(incident Incident) (string, err
 	response, err := snClient.create("incident", postBody)
 	if err != nil {
 		log.Errorf("Error while creating the incident. %s", err)
+		return "", err
+	}
+
+	return response, nil
+}
+
+// GetIncident will retrieve an incident from ServiceNow
+func (snClient *ServiceNowClient) GetIncident(params map[string]string) (string, error) {
+	response, err := snClient.get("incident", params)
+
+	if err != nil {
+		log.Errorf("Error while getting the incident. %s", err)
 		return "", err
 	}
 
