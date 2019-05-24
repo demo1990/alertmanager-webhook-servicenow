@@ -31,10 +31,20 @@ type Incident struct {
 	Urgency          json.Number `json:"urgency"`
 }
 
+// GetIncidentsResponse is a model of the response from a get on multiple incidents
+type GetIncidentsResponse struct {
+	Result []Incident `json:"result"`
+}
+
+// IncidentResponse is a model of the response from for one incident
+type IncidentResponse struct {
+	Result Incident `json:"result"`
+}
+
 // ServiceNow interface
 type ServiceNow interface {
-	CreateIncident(incident Incident) (string, error)
-	GetIncident(params map[string]string) (string, error)
+	CreateIncident(incident Incident) (*Incident, error)
+	GetIncidents(params map[string]string) ([]Incident, error)
 }
 
 // ServiceNowClient is the interface to a ServiceNow instance
@@ -66,26 +76,26 @@ func NewServiceNowClient(instanceName string, userName string, password string) 
 }
 
 // Create a table item in ServiceNow from a post body
-func (snClient *ServiceNowClient) create(table string, body []byte) (string, error) {
+func (snClient *ServiceNowClient) create(table string, body []byte) ([]byte, error) {
 	log.Infof("Create a ServiceNow %s", table)
 	url := fmt.Sprintf(tableAPI, snClient.baseURL, table)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		log.Errorf("Error creating the request. %s", err)
-		return "", err
+		return nil, err
 	}
 
 	return snClient.doRequest(req)
 }
 
 // get a table item from ServiceNow using a map of arguments
-func (snClient *ServiceNowClient) get(table string, params map[string]string) (string, error) {
+func (snClient *ServiceNowClient) get(table string, params map[string]string) ([]byte, error) {
 	log.Infof("Get a ServiceNow %s", table)
 	url := fmt.Sprintf(tableAPI, snClient.baseURL, table)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		log.Errorf("Error creating the request. %s", err)
-		return "", err
+		return nil, err
 	}
 
 	q := req.URL.Query()
@@ -97,19 +107,19 @@ func (snClient *ServiceNowClient) get(table string, params map[string]string) (s
 	return snClient.doRequest(req)
 }
 
-// doRequest will do the given ServiceNow request and return response as string
-func (snClient *ServiceNowClient) doRequest(req *http.Request) (string, error) {
+// doRequest will do the given ServiceNow request and return response as byte array
+func (snClient *ServiceNowClient) doRequest(req *http.Request) ([]byte, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", snClient.authHeader)
 	resp, err := snClient.client.Do(req)
 	if err != nil {
 		log.Errorf("Error sending the request. %s", err)
-		return "", err
+		return nil, err
 	}
 	if resp.StatusCode >= 400 {
 		errorMsg := fmt.Sprintf("ServiceNow returned the HTTP error code: %v", resp.StatusCode)
 		log.Error(errorMsg)
-		return "", errors.New(errorMsg)
+		return nil, errors.New(errorMsg)
 	}
 
 	defer resp.Body.Close()
@@ -117,37 +127,51 @@ func (snClient *ServiceNowClient) doRequest(req *http.Request) (string, error) {
 	responseBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Errorf("Error reading the body. %s", err)
-		return "", err
+		return nil, err
 	}
 
-	return string(responseBody), nil
+	return responseBody, nil
 }
 
-// CreateIncident will create an incident in ServiceNow from an Incident
-func (snClient *ServiceNowClient) CreateIncident(incident Incident) (string, error) {
+// CreateIncident will create an incident in ServiceNow from a given Incident, and return the created incident
+func (snClient *ServiceNowClient) CreateIncident(incident Incident) (*Incident, error) {
 	postBody, err := json.Marshal(incident)
 	if err != nil {
 		log.Errorf("Error while marshalling the incident. %s", err)
-		return "", err
+		return nil, err
 	}
 
 	response, err := snClient.create("incident", postBody)
 	if err != nil {
 		log.Errorf("Error while creating the incident. %s", err)
-		return "", err
+		return nil, err
 	}
 
-	return response, nil
+	incidentResponse := IncidentResponse{}
+	err = json.Unmarshal(response, &incidentResponse)
+	if err != nil {
+		log.Errorf("Error while unmarshalling the incident. %s", err)
+		return nil, err
+	}
+
+	return &incidentResponse.Result, nil
 }
 
-// GetIncident will retrieve an incident from ServiceNow
-func (snClient *ServiceNowClient) GetIncident(params map[string]string) (string, error) {
+// GetIncidents will retrieve an incident from ServiceNow
+func (snClient *ServiceNowClient) GetIncidents(params map[string]string) ([]Incident, error) {
 	response, err := snClient.get("incident", params)
 
 	if err != nil {
 		log.Errorf("Error while getting the incident. %s", err)
-		return "", err
+		return nil, err
 	}
 
-	return response, nil
+	getIncidentResponse := GetIncidentsResponse{}
+	err = json.Unmarshal(response, &getIncidentResponse)
+	if err != nil {
+		log.Errorf("Error while unmarshalling the incident. %s", err)
+		return nil, err
+	}
+
+	return getIncidentResponse.Result, nil
 }

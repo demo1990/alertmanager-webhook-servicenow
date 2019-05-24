@@ -15,23 +15,23 @@ type MockedSnClient struct {
 	mock.Mock
 }
 
-func (mock *MockedSnClient) CreateIncident(incident Incident) (string, error) {
+func (mock *MockedSnClient) CreateIncident(incident Incident) (*Incident, error) {
 	args := mock.Called(incident)
-	return args.String(0), args.Error(1)
+	return args.Get(0).(*Incident), args.Error(1)
 }
 
-func (mock *MockedSnClient) GetIncident(params map[string]string) (string, error) {
+func (mock *MockedSnClient) GetIncidents(params map[string]string) ([]Incident, error) {
 	args := mock.Called(params)
-	return args.String(0), args.Error(1)
+	return args.Get(0).([]Incident), args.Error(1)
 }
 
 func TestWebhookHandler_OK(t *testing.T) {
 	snClientMock := new(MockedSnClient)
 	serviceNow = snClientMock
-	snClientMock.On("CreateIncident", mock.Anything).Return(`{"sys_id":"424242","number":"INC42"}`, nil)
+	snClientMock.On("CreateIncident", mock.Anything).Return(&basicIncident, nil)
 
 	// Load a simple example of a body coming from AlertManager
-	data, err := ioutil.ReadFile("test_param.json")
+	data, err := ioutil.ReadFile("test/alertmanager_body.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,10 +84,10 @@ func TestWebhookHandler_BadRequest(t *testing.T) {
 func TestWebhookHandler_InternalServerError(t *testing.T) {
 	snClientMock := new(MockedSnClient)
 	serviceNow = snClientMock
-	snClientMock.On("CreateIncident", mock.Anything).Return("", errors.New("Error"))
+	snClientMock.On("CreateIncident", mock.Anything).Return(&Incident{}, errors.New("Error"))
 
 	// Load a simple example of a body coming from AlertManager
-	data, err := ioutil.ReadFile("test_param.json")
+	data, err := ioutil.ReadFile("test/alertmanager_body.json")
 	if err != nil {
 		t.Fatal(err)
 	}

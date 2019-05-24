@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -13,6 +15,7 @@ var basicIncident = Incident{
 	Description:      "This is the description",
 	ShortDescription: "This is the short description",
 	Impact:           "4",
+	State:            "0",
 	Urgency:          "3",
 }
 
@@ -67,9 +70,15 @@ func TestNewServiceNowClient_MissingPassword(t *testing.T) {
 }
 
 func TestCreateIncident_OK(t *testing.T) {
-	testHandler := func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"sys_id":"424242","number":"INC42"}`)
+	// Load a simple example of a response coming from ServiceNow
+	incidentResponse, err := ioutil.ReadFile("test/incident_response.json")
+	if err != nil {
+		t.Fatal(err)
 	}
+	testHandler := func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, string(incidentResponse))
+	}
+
 	ts := httptest.NewServer(http.HandlerFunc(testHandler))
 	defer ts.Close()
 
@@ -80,15 +89,17 @@ func TestCreateIncident_OK(t *testing.T) {
 		t.Errorf("Error occured on NewServiceNowClient: %s", err)
 	}
 
-	response, err := snClient.CreateIncident(basicIncident)
+	incident, err := snClient.CreateIncident(basicIncident)
 
 	if err != nil {
 		t.Errorf("Error occured on CreateIncident: %s", err)
 	}
 
-	expectedResponse := `{"sys_id":"424242","number":"INC42"}`
-	if response != expectedResponse {
-		t.Errorf("Unexpected response; got: %v, want: %v", response, expectedResponse)
+	expectedIncidentResponse := IncidentResponse{}
+	_ = json.Unmarshal(incidentResponse, &expectedIncidentResponse)
+
+	if !reflect.DeepEqual(*incident, expectedIncidentResponse.Result) {
+		t.Errorf("Unexpected response; got: %v, want: %v", incident, expectedIncidentResponse.Result)
 	}
 }
 
@@ -164,6 +175,53 @@ func TestCreateIncident_InternalServerError(t *testing.T) {
 	}
 
 	_, err = snClient.CreateIncident(basicIncident)
+
+	if err == nil {
+		t.Errorf("Expected an error, got none")
+	}
+}
+
+func TestGetIncidents_OK(t *testing.T) {
+	// Load a simple example of a response coming from ServiceNow
+	getIncidentsResponse, err := ioutil.ReadFile("test/get_incidents_response.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testHandler := func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, string(getIncidentsResponse))
+	}
+	ts := httptest.NewServer(http.HandlerFunc(testHandler))
+	defer ts.Close()
+
+	snClient, err := NewServiceNowClient("instancename", "username", "password")
+	snClient.baseURL = ts.URL
+	if err != nil {
+		t.Errorf("Error occured on NewServiceNowClient: %s", err)
+	}
+
+	incidents, err := snClient.GetIncidents(nil)
+	if err != nil {
+		t.Errorf("Error occured on CreateIncident: %s", err)
+	}
+
+	expectedIncidentsResponse := GetIncidentsResponse{}
+	_ = json.Unmarshal(getIncidentsResponse, &expectedIncidentsResponse)
+
+	if !reflect.DeepEqual(incidents, expectedIncidentsResponse.Result) {
+		t.Errorf("Unexpected incident; got: %v, want: %v", incidents, expectedIncidentsResponse.Result)
+	}
+}
+
+func TestGetIncidents_CreateRequestError(t *testing.T) {
+	snClient, err := NewServiceNowClient("instancename", "username", "password")
+	// Cause an error by using an invalid URL
+	snClient.baseURL = "very bad url"
+
+	if err != nil {
+		t.Errorf("Error occured on NewServiceNowClient: %s", err)
+	}
+
+	_, err = snClient.GetIncidents(nil)
 
 	if err == nil {
 		t.Errorf("Expected an error, got none")
