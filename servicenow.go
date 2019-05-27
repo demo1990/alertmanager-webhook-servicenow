@@ -17,11 +17,11 @@ const (
 	tableAPI          = "%s/api/now/v2/table/%s"
 )
 
-// Incident is a model of the ServiceNow incident table
+// Incident is a model of the created ServiceNow incident
 type Incident struct {
-	AssignmentGroup  string      `json:"assignment_group"`
+	AssignmentGroup  LinkedValue `json:"assignment_group"`
 	ContactType      string      `json:"contact_type"`
-	CallerID         string      `json:"caller_id"`
+	CallerID         LinkedValue `json:"caller_id"`
 	Comments         string      `json:"comments"`
 	Description      string      `json:"description"`
 	Impact           json.Number `json:"impact"`
@@ -31,13 +31,16 @@ type Incident struct {
 	Urgency          json.Number `json:"urgency"`
 }
 
-// GetIncidentsResponse is a model of the response from a get on multiple incidents
+// LinkedValue is a basic ServiceNow element containing a link field and a value field (or could be a string)
+type LinkedValue interface{}
+
+// GetIncidentsResponse is a model of the response from a get on incidents
 type GetIncidentsResponse struct {
 	Result []Incident `json:"result"`
 }
 
-// IncidentResponse is a model of the response from for one incident
-type IncidentResponse struct {
+// CreateIncidentResponse is a model of the response from a POST of a new incident
+type CreateIncidentResponse struct {
 	Result Incident `json:"result"`
 }
 
@@ -147,14 +150,16 @@ func (snClient *ServiceNowClient) CreateIncident(incident Incident) (*Incident, 
 		return nil, err
 	}
 
-	incidentResponse := IncidentResponse{}
-	err = json.Unmarshal(response, &incidentResponse)
+	createIncidentResponse := CreateIncidentResponse{}
+	err = json.Unmarshal(response, &createIncidentResponse)
 	if err != nil {
 		log.Errorf("Error while unmarshalling the incident. %s", err)
 		return nil, err
 	}
 
-	return &incidentResponse.Result, nil
+	log.Info("Incident created.")
+
+	return &createIncidentResponse.Result, nil
 }
 
 // GetIncidents will retrieve an incident from ServiceNow

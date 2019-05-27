@@ -40,10 +40,7 @@
       "company": "",
       "active": "true",
       "due_date": "",
-      "assignment_group": {
-        "link": "https://instance.service-now.com/api/now/table/sys_user_group/287ebd7da9fe198100f92cc8d1d2154e",
-        "value": "287ebd7da9fe198100f92cc8d1d2154e"
-      },
+      "assignment_group": "",
       "caller_id": "",
       "knowledge": "false",
       "made_sla": "true",
