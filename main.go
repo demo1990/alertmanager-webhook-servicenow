@@ -148,15 +148,34 @@ func createSnClient(config Config) ServiceNow {
 
 func manageIncidents(data template.Data, config Config) error {
 
-	log.Infof("Alerts: Status=%s, GroupLabels=%v, CommonLabels=%v, CommonAnnotations=%v",
+	log.Infof("Received alert group: Status=%s, GroupLabels=%v, CommonLabels=%v, CommonAnnotations=%v",
 		data.Status, data.GroupLabels, data.CommonLabels, data.CommonAnnotations)
 
-	incident := dataToIncident(data)
-	_, err := serviceNow.CreateIncident(incident)
+	groupKey := getGroupKey(data)
+	getParams := map[string]string{
+		groupKeySnField: groupKey,
+	}
 
-	if err != nil {
-		log.Errorf("Error while creating incident: %v", err)
-		return err
+	incidents, err := serviceNow.GetIncidents(getParams)
+
+	if len(incidents) == 0 {
+		log.Infof("Found no existing incident for alert group key: %s", groupKey)
+		incident := dataToIncident(data)
+		if _, err = serviceNow.CreateIncident(incident); err != nil {
+			return err
+		}
+	} else if len(incidents) == 1 {
+		existingIncident := incidents[0]
+		log.Infof("Found one existing incident (%s) for alert group key: %s", existingIncident.Number, groupKey)
+		incident := dataToIncident(data)
+		incident.SysID = existingIncident.SysID
+		incident.Number = existingIncident.Number
+		if _, err = serviceNow.UpdateIncident(incident); err != nil {
+			return err
+		}
+	} else {
+		log.Warnf("Found multiple existing incidents for alert group key: %s", groupKey)
+		// TODO update last incident
 	}
 
 	return nil
@@ -199,9 +218,15 @@ func dataToIncident(data template.Data) Incident {
 		CallerID:         config.ServiceNow.UserName,
 		Comments:         commentBuilder.String(),
 		Description:      descriptionBuilder.String(),
+		GroupKey:         getGroupKey(data),
 		Impact:           config.DefaultIncident.Impact,
 		ShortDescription: shortDescriptionBuilder.String(),
 		Urgency:          config.DefaultIncident.Urgency,
 	}
+
 	return incident
+}
+
+func getGroupKey(data template.Data) string {
+	return fmt.Sprintf("%v", data.GroupLabels.SortedPairs())
 }

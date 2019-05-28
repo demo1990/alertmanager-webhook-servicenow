@@ -96,11 +96,11 @@ func TestCreateIncident_OK(t *testing.T) {
 		t.Errorf("Error occured on CreateIncident: %s", err)
 	}
 
-	expectedCreateIncidentResponse := CreateIncidentResponse{}
-	_ = json.Unmarshal(incidentResponse, &expectedCreateIncidentResponse)
+	expectedIncidentResponse := IncidentResponse{}
+	_ = json.Unmarshal(incidentResponse, &expectedIncidentResponse)
 
-	if !reflect.DeepEqual(*incident, expectedCreateIncidentResponse.Result) {
-		t.Errorf("Unexpected response; got: %v, want: %v", incident, expectedCreateIncidentResponse.Result)
+	if !reflect.DeepEqual(*incident, expectedIncidentResponse.Result) {
+		t.Errorf("Unexpected response; got: %v, want: %v", incident, expectedIncidentResponse.Result)
 	}
 }
 
@@ -130,11 +130,11 @@ func TestCreateIncident_OK_No_AG(t *testing.T) {
 		t.Errorf("Error occured on CreateIncident: %s", err)
 	}
 
-	expectedCreateIncidentResponse := CreateIncidentResponse{}
-	_ = json.Unmarshal(incidentResponse, &expectedCreateIncidentResponse)
+	expectedIncidentResponse := IncidentResponse{}
+	_ = json.Unmarshal(incidentResponse, &expectedIncidentResponse)
 
-	if !reflect.DeepEqual(*incident, expectedCreateIncidentResponse.Result) {
-		t.Errorf("Unexpected response; got: %v, want: %v", incident, expectedCreateIncidentResponse.Result)
+	if !reflect.DeepEqual(*incident, expectedIncidentResponse.Result) {
+		t.Errorf("Unexpected response; got: %v, want: %v", incident, expectedIncidentResponse.Result)
 	}
 }
 
@@ -218,12 +218,12 @@ func TestCreateIncident_InternalServerError(t *testing.T) {
 
 func TestGetIncidents_OK(t *testing.T) {
 	// Load a simple example of a response coming from ServiceNow
-	getIncidentsResponse, err := ioutil.ReadFile("test/get_incidents_response.json")
+	incidentsResponse, err := ioutil.ReadFile("test/get_incidents_response.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	testHandler := func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, string(getIncidentsResponse))
+		fmt.Fprint(w, string(incidentsResponse))
 	}
 	ts := httptest.NewServer(http.HandlerFunc(testHandler))
 	defer ts.Close()
@@ -239,8 +239,8 @@ func TestGetIncidents_OK(t *testing.T) {
 		t.Errorf("Error occured on CreateIncident: %s", err)
 	}
 
-	expectedIncidentsResponse := GetIncidentsResponse{}
-	_ = json.Unmarshal(getIncidentsResponse, &expectedIncidentsResponse)
+	expectedIncidentsResponse := IncidentsResponse{}
+	_ = json.Unmarshal(incidentsResponse, &expectedIncidentsResponse)
 
 	if !reflect.DeepEqual(incidents, expectedIncidentsResponse.Result) {
 		t.Errorf("Unexpected incident; got: %v, want: %v", incidents, expectedIncidentsResponse.Result)
