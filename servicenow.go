@@ -15,55 +15,88 @@ import (
 const (
 	serviceNowBaseURL = "https://%s.service-now.com"
 	tableAPI          = "%s/api/now/v2/table/%s"
-	groupKeySnField   = "u_other_reference_1"
 )
 
-// Incident is a model of the created ServiceNow incident
-type Incident struct {
-	AssignmentGroup  LinkedValue `json:"assignment_group"`
-	ContactType      string      `json:"contact_type,omitempty"`
-	CallerID         LinkedValue `json:"caller_id,omitempty"`
-	Comments         string      `json:"comments"`
-	Description      string      `json:"description"`
-	GroupKey         string      `json:"u_other_reference_1"`
-	Impact           json.Number `json:"impact,omitempty"`
-	Number           string      `json:"number,omitempty"`
-	Priority         string      `json:"priority,omitempty"`
-	ShortDescription string      `json:"short_description"`
-	State            json.Number `json:"state,omitempty"`
-	SysID            string      `json:"sys_id,omitempty"`
-	Urgency          json.Number `json:"urgency,omitempty"`
+// IncidentParam is a model of the managed incident paramters
+type IncidentParam struct {
+	AssignmentGroup  string
+	CallerID         string
+	Comments         string
+	Description      string
+	GroupKey         string
+	Impact           json.Number
+	ShortDescription string
+	State            json.Number
+	Urgency          json.Number
 }
 
-// LinkedValue is a basic ServiceNow element containing a link field and a value field (or could be a string)
-type LinkedValue interface{}
+// Incident is a model of the ServiceNow incident table
+type Incident map[string]interface{}
 
-// IncidentsResponse is a model of a response with multiple incidents
-type IncidentsResponse struct {
-	Result []Incident `json:"result"`
+// GetSysID returns the sys_id of the incident
+func (i Incident) GetSysID() string {
+	return i["sys_id"].(string)
 }
 
-// IncidentResponse is a model of a response with only one incident
-type IncidentResponse struct {
-	Result Incident `json:"result"`
+// GetNumber returns the number of the incident
+func (i Incident) GetNumber() string {
+	return i["number"].(string)
+}
+
+// IncidentResponse is a model of an API response contaning one incident
+type IncidentResponse map[string]interface{}
+
+// GetResult returns the incident from the IncidentResponse
+func (ir IncidentResponse) GetResult() Incident {
+	var incident Incident = ir["result"].(map[string]interface{})
+	return incident
+}
+
+// IncidentsResponse is a model of an API response contaning multiple incidents
+type IncidentsResponse map[string]interface{}
+
+// GetResults returns the incidents from the IncidentsResponse
+func (ir IncidentsResponse) GetResults() []Incident {
+	results := ir["result"].([]interface{})
+	incidents := make([]Incident, len(results))
+	for i, result := range results {
+		incidents[i] = result.(map[string]interface{})
+	}
+	return incidents
+}
+
+// NewIncident creates an incident based on params
+func NewIncident(param IncidentParam, groupKeyField string) Incident {
+	incident := Incident{
+		"assignment_group":  param.AssignmentGroup,
+		"caller_id":         param.CallerID,
+		"comments":          param.Comments,
+		"description":       param.Description,
+		"impact":            param.Impact,
+		"short_description": param.ShortDescription,
+		groupKeyField:       param.GroupKey,
+		"urgency":           param.Urgency,
+	}
+	return incident
 }
 
 // ServiceNow interface
 type ServiceNow interface {
-	CreateIncident(incident Incident) (*Incident, error)
+	CreateIncident(incidentParam IncidentParam) (Incident, error)
 	GetIncidents(params map[string]string) ([]Incident, error)
-	UpdateIncident(incident Incident) (*Incident, error)
+	UpdateIncident(incidentParam IncidentParam, sysID string) (Incident, error)
 }
 
 // ServiceNowClient is the interface to a ServiceNow instance
 type ServiceNowClient struct {
-	baseURL    string
-	authHeader string
-	client     *http.Client
+	baseURL       string
+	authHeader    string
+	client        *http.Client
+	groupKeyField string
 }
 
 // NewServiceNowClient will create a new ServiceNow client
-func NewServiceNowClient(instanceName string, userName string, password string) (*ServiceNowClient, error) {
+func NewServiceNowClient(instanceName string, userName string, password string, groupKeyField string) (*ServiceNowClient, error) {
 	if instanceName == "" {
 		return nil, errors.New("Missing instanceName")
 	}
@@ -76,10 +109,15 @@ func NewServiceNowClient(instanceName string, userName string, password string) 
 		return nil, errors.New("Missing password")
 	}
 
+	if groupKeyField == "" {
+		return nil, errors.New("Missing groupKeyField")
+	}
+
 	return &ServiceNowClient{
-		baseURL:    fmt.Sprintf(serviceNowBaseURL, instanceName),
-		authHeader: fmt.Sprintf("Basic %s", base64.URLEncoding.EncodeToString([]byte(userName+":"+password))),
-		client:     http.DefaultClient,
+		baseURL:       fmt.Sprintf(serviceNowBaseURL, instanceName),
+		authHeader:    fmt.Sprintf("Basic %s", base64.URLEncoding.EncodeToString([]byte(userName+":"+password))),
+		client:        http.DefaultClient,
+		groupKeyField: groupKeyField,
 	}, nil
 }
 
@@ -152,8 +190,10 @@ func (snClient *ServiceNowClient) doRequest(req *http.Request) ([]byte, error) {
 }
 
 // CreateIncident will create an incident in ServiceNow from a given Incident, and return the created incident
-func (snClient *ServiceNowClient) CreateIncident(incident Incident) (*Incident, error) {
+func (snClient *ServiceNowClient) CreateIncident(incidentParam IncidentParam) (Incident, error) {
 	log.Info("Create a ServiceNow incident")
+
+	incident := NewIncident(incidentParam, snClient.groupKeyField)
 
 	postBody, err := json.Marshal(incident)
 	if err != nil {
@@ -174,9 +214,10 @@ func (snClient *ServiceNowClient) CreateIncident(incident Incident) (*Incident, 
 		return nil, err
 	}
 
-	log.Infof("Incident %s created", incidentResponse.Result.Number)
+	incident = incidentResponse.GetResult()
+	log.Infof("Incident %s created", incident.GetNumber())
 
-	return &incidentResponse.Result, nil
+	return incident, nil
 }
 
 // GetIncidents will retrieve an incident from ServiceNow
@@ -196,20 +237,22 @@ func (snClient *ServiceNowClient) GetIncidents(params map[string]string) ([]Inci
 		return nil, err
 	}
 
-	return incidentsResponse.Result, nil
+	return incidentsResponse.GetResults(), nil
 }
 
 // UpdateIncident will update an incident in ServiceNow from a given Incident, and return the updated incident
-func (snClient *ServiceNowClient) UpdateIncident(incident Incident) (*Incident, error) {
-	log.Infof("Update ServiceNow incident %s", incident.Number)
+func (snClient *ServiceNowClient) UpdateIncident(incidentParam IncidentParam, sysID string) (Incident, error) {
+	log.Infof("Update ServiceNow incident with id : %s", sysID)
 
-	postBody, err := json.Marshal(incident)
+	incidentUpdate := NewIncident(incidentParam, snClient.groupKeyField)
+
+	postBody, err := json.Marshal(incidentUpdate)
 	if err != nil {
 		log.Errorf("Error while marshalling the incident. %s", err)
 		return nil, err
 	}
 
-	response, err := snClient.update("incident", postBody, incident.SysID)
+	response, err := snClient.update("incident", postBody, sysID)
 	if err != nil {
 		log.Errorf("Error while updating the incident. %s", err)
 		return nil, err
@@ -222,7 +265,8 @@ func (snClient *ServiceNowClient) UpdateIncident(incident Incident) (*Incident, 
 		return nil, err
 	}
 
-	log.Infof("Incident %s updated", incidentResponse.Result.Number)
+	incident := incidentResponse.GetResult()
+	log.Infof("Incident %s updated", incident.GetNumber())
 
-	return &incidentResponse.Result, nil
+	return incident, nil
 }

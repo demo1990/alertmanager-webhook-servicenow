@@ -32,9 +32,10 @@ type Config struct {
 
 // ServiceNowConfig - ServiceNow instance configuration
 type ServiceNowConfig struct {
-	InstanceName string `yaml:"instance_name"`
-	UserName     string `yaml:"user_name"`
-	Password     string `yaml:"password"`
+	InstanceName          string `yaml:"instance_name"`
+	UserName              string `yaml:"user_name"`
+	Password              string `yaml:"password"`
+	IncidentGroupKeyField string `yaml:"incident_group_key_field"`
 }
 
 // DefaultIncidentConfig - Default configuration for an incident
@@ -59,7 +60,7 @@ func webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = manageIncidents(data, config)
+	err = manageIncidents(data)
 
 	if err != nil {
 		log.Errorf("Error managing incident from alert : %v", err)
@@ -139,49 +140,47 @@ func loadConfig(configFile string) Config {
 
 func createSnClient(config Config) ServiceNow {
 	var err error
-	serviceNow, err = NewServiceNowClient(config.ServiceNow.InstanceName, config.ServiceNow.UserName, config.ServiceNow.Password)
+	serviceNow, err = NewServiceNowClient(config.ServiceNow.InstanceName, config.ServiceNow.UserName, config.ServiceNow.Password, config.ServiceNow.IncidentGroupKeyField)
 	if err != nil {
 		log.Fatalf("Error creating the ServiceNow client: %v", err)
 	}
 	return serviceNow
 }
 
-func manageIncidents(data template.Data, config Config) error {
+func manageIncidents(data template.Data) error {
 
 	log.Infof("Received alert group: Status=%s, GroupLabels=%v, CommonLabels=%v, CommonAnnotations=%v",
 		data.Status, data.GroupLabels, data.CommonLabels, data.CommonAnnotations)
 
 	groupKey := getGroupKey(data)
 	getParams := map[string]string{
-		groupKeySnField: groupKey,
+		config.ServiceNow.IncidentGroupKeyField: groupKey,
 	}
 
 	incidents, err := serviceNow.GetIncidents(getParams)
 
 	if len(incidents) == 0 {
 		log.Infof("Found no existing incident for alert group key: %s", groupKey)
-		incident := dataToIncident(data)
+		incident := dataToIncidentParam(data)
 		if _, err = serviceNow.CreateIncident(incident); err != nil {
 			return err
 		}
-	} else if len(incidents) == 1 {
+	} else {
+		if len(incidents) > 1 {
+			log.Warnf("Found multiple existing incidents for alert group key: %s. Will use first one.", groupKey)
+		}
 		existingIncident := incidents[0]
-		log.Infof("Found one existing incident (%s) for alert group key: %s", existingIncident.Number, groupKey)
-		incident := dataToIncident(data)
-		incident.SysID = existingIncident.SysID
-		incident.Number = existingIncident.Number
-		if _, err = serviceNow.UpdateIncident(incident); err != nil {
+		log.Infof("Found existing incident (%s) for alert group key: %s", existingIncident.GetNumber(), groupKey)
+		incident := dataToIncidentParam(data)
+		if _, err = serviceNow.UpdateIncident(incident, existingIncident.GetSysID()); err != nil {
 			return err
 		}
-	} else {
-		log.Warnf("Found multiple existing incidents for alert group key: %s", groupKey)
-		// TODO update last incident
 	}
 
 	return nil
 }
 
-func dataToIncident(data template.Data) Incident {
+func dataToIncidentParam(data template.Data) IncidentParam {
 
 	var shortDescriptionBuilder strings.Builder
 	shortDescriptionBuilder.WriteString(fmt.Sprintf("[%s] ", data.Status))
@@ -213,18 +212,18 @@ func dataToIncident(data template.Data) Incident {
 		commentBuilder.WriteString(fmt.Sprintf("\n\n%s", alertBuilder.String()))
 	}
 
-	incident := Incident{
+	incidentParam := IncidentParam{
 		AssignmentGroup:  config.DefaultIncident.AssignmentGroup,
 		CallerID:         config.ServiceNow.UserName,
 		Comments:         commentBuilder.String(),
 		Description:      descriptionBuilder.String(),
-		GroupKey:         getGroupKey(data),
 		Impact:           config.DefaultIncident.Impact,
 		ShortDescription: shortDescriptionBuilder.String(),
+		GroupKey:         getGroupKey(data),
 		Urgency:          config.DefaultIncident.Urgency,
 	}
 
-	return incident
+	return incidentParam
 }
 
 func getGroupKey(data template.Data) string {

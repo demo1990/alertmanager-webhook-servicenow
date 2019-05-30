@@ -2,6 +2,8 @@ service_now:
   instance_name: "<instance name>"
   user_name: "<user>"
   password: "<password>"
+  # Name of an existing ServiceNow table field that will be used as a key to reference alert groups
+  incident_group_key_field: "<incident table field>"
 
 default_incident:
   # Sysid or name of the assignment group

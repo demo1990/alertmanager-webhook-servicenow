@@ -15,9 +15,9 @@ type MockedSnClient struct {
 	mock.Mock
 }
 
-func (mock *MockedSnClient) CreateIncident(incident Incident) (*Incident, error) {
-	args := mock.Called(incident)
-	return args.Get(0).(*Incident), args.Error(1)
+func (mock *MockedSnClient) CreateIncident(incidentParam IncidentParam) (Incident, error) {
+	args := mock.Called(incidentParam)
+	return args.Get(0).(Incident), args.Error(1)
 }
 
 func (mock *MockedSnClient) GetIncidents(params map[string]string) ([]Incident, error) {
@@ -25,16 +25,16 @@ func (mock *MockedSnClient) GetIncidents(params map[string]string) ([]Incident, 
 	return args.Get(0).([]Incident), args.Error(1)
 }
 
-func (mock *MockedSnClient) UpdateIncident(incident Incident) (*Incident, error) {
-	args := mock.Called(incident)
-	return args.Get(0).(*Incident), args.Error(1)
+func (mock *MockedSnClient) UpdateIncident(incidentParam IncidentParam, sysID string) (Incident, error) {
+	args := mock.Called(incidentParam, sysID)
+	return args.Get(0).(Incident), args.Error(1)
 }
 
 func TestWebhookHandler_OK(t *testing.T) {
 	snClientMock := new(MockedSnClient)
 	serviceNow = snClientMock
 	snClientMock.On("GetIncidents", mock.Anything).Return([]Incident{}, nil)
-	snClientMock.On("CreateIncident", mock.Anything).Return(&basicIncident, nil)
+	snClientMock.On("CreateIncident", mock.Anything).Return(Incident{}, nil)
 
 	// Load a simple example of a body coming from AlertManager
 	data, err := ioutil.ReadFile("test/alertmanager_body.json")
@@ -91,7 +91,7 @@ func TestWebhookHandler_InternalServerError(t *testing.T) {
 	snClientMock := new(MockedSnClient)
 	serviceNow = snClientMock
 	snClientMock.On("GetIncidents", mock.Anything).Return([]Incident{}, nil)
-	snClientMock.On("CreateIncident", mock.Anything).Return(&Incident{}, errors.New("Error"))
+	snClientMock.On("CreateIncident", mock.Anything).Return(Incident{}, errors.New("Error"))
 
 	// Load a simple example of a body coming from AlertManager
 	data, err := ioutil.ReadFile("test/alertmanager_body.json")
