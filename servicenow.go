@@ -43,6 +43,11 @@ func (i Incident) GetNumber() string {
 	return i["number"].(string)
 }
 
+// GetState returns the state of the incident
+func (i Incident) GetState() string {
+	return i["state"].(string)
+}
+
 // IncidentResponse is a model of an API response contaning one incident
 type IncidentResponse map[string]interface{}
 

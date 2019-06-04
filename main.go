@@ -32,10 +32,11 @@ type Config struct {
 
 // ServiceNowConfig - ServiceNow instance configuration
 type ServiceNowConfig struct {
-	InstanceName          string `yaml:"instance_name"`
-	UserName              string `yaml:"user_name"`
-	Password              string `yaml:"password"`
-	IncidentGroupKeyField string `yaml:"incident_group_key_field"`
+	InstanceName          string   `yaml:"instance_name"`
+	UserName              string   `yaml:"user_name"`
+	Password              string   `yaml:"password"`
+	IncidentGroupKeyField string   `yaml:"incident_group_key_field"`
+	NoUpdateStates        []string `yaml:"no_update_states"`
 }
 
 // DefaultIncidentConfig - Default configuration for an incident
@@ -60,7 +61,7 @@ func webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = manageIncidents(data)
+	err = onAlertGroup(data)
 
 	if err != nil {
 		log.Errorf("Error managing incident from alert : %v", err)
@@ -147,36 +148,71 @@ func createSnClient(config Config) ServiceNow {
 	return serviceNow
 }
 
-func manageIncidents(data template.Data) error {
+func onAlertGroup(data template.Data) error {
 
 	log.Infof("Received alert group: Status=%s, GroupLabels=%v, CommonLabels=%v, CommonAnnotations=%v",
 		data.Status, data.GroupLabels, data.CommonLabels, data.CommonAnnotations)
 
-	groupKey := getGroupKey(data)
 	getParams := map[string]string{
-		config.ServiceNow.IncidentGroupKeyField: groupKey,
+		config.ServiceNow.IncidentGroupKeyField: getGroupKey(data),
 	}
 
 	incidents, err := serviceNow.GetIncidents(getParams)
+	if err != nil {
+		return err
+	}
 
-	if len(incidents) == 0 {
-		log.Infof("Found no existing incident for alert group key: %s", groupKey)
-		incident := dataToIncidentParam(data)
-		if _, err = serviceNow.CreateIncident(incident); err != nil {
+	var incident Incident
+	if len(incidents) > 0 {
+		incident = incidents[0]
+	}
+	if len(incidents) > 1 {
+		log.Warnf("Found multiple existing incidents for alert group key: %s. Will use first one.", getGroupKey(data))
+	}
+
+	if data.Status == "firing" {
+		return onFiringGroup(data, incident)
+	} else if data.Status == "resolved" {
+		return onResolvedGroup(data, incident)
+	} else {
+		log.Warnf("Unknown alert group status: %s", data.Status)
+	}
+
+	return nil
+}
+
+func onFiringGroup(data template.Data, incident Incident) error {
+	incidentParam := dataToIncidentParam(data)
+	if incident == nil {
+		log.Infof("Found no existing incident for firing alert group key: %s", getGroupKey(data))
+		if _, err := serviceNow.CreateIncident(incidentParam); err != nil {
 			return err
 		}
 	} else {
-		if len(incidents) > 1 {
-			log.Warnf("Found multiple existing incidents for alert group key: %s. Will use first one.", groupKey)
+		log.Infof("Found existing incident (%s), with state %s, for firing alert group key: %s", incident.GetNumber(), incident.GetState(), getGroupKey(data))
+		if stringInSlice(incident.GetState(), config.ServiceNow.NoUpdateStates) {
+			if _, err := serviceNow.CreateIncident(incidentParam); err != nil {
+				return err
+			}
+		} else {
+			if _, err := serviceNow.UpdateIncident(incidentParam, incident.GetSysID()); err != nil {
+				return err
+			}
 		}
-		existingIncident := incidents[0]
-		log.Infof("Found existing incident (%s) for alert group key: %s", existingIncident.GetNumber(), groupKey)
-		incident := dataToIncidentParam(data)
-		if _, err = serviceNow.UpdateIncident(incident, existingIncident.GetSysID()); err != nil {
+	}
+	return nil
+}
+
+func onResolvedGroup(data template.Data, incident Incident) error {
+	incidentParam := dataToIncidentParam(data)
+	if incident == nil {
+		log.Warnf("Found no existing incident for resolved alert group key: %s. Do nothing.", getGroupKey(data))
+	} else {
+		log.Infof("Found existing incident (%s), with state %s, for resolved alert group key: %s", incident.GetNumber(), incident.GetState(), getGroupKey(data))
+		if _, err := serviceNow.UpdateIncident(incidentParam, incident.GetSysID()); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -228,4 +264,13 @@ func dataToIncidentParam(data template.Data) IncidentParam {
 
 func getGroupKey(data template.Data) string {
 	return fmt.Sprintf("%v", data.GroupLabels.SortedPairs())
+}
+
+func stringInSlice(n string, list []string) bool {
+	for _, b := range list {
+		if b == n {
+			return true
+		}
+	}
+	return false
 }
