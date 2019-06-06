@@ -42,6 +42,8 @@ type ServiceNowConfig struct {
 // DefaultIncidentConfig - Default configuration for an incident
 type DefaultIncidentConfig struct {
 	AssignmentGroup string      `yaml:"assignment_group"`
+	Company         string      `yaml:"company"`
+	ContactType     string      `yaml:"contact_type"`
 	Impact          json.Number `yaml:"impact"`
 	Urgency         json.Number `yaml:"urgency"`
 }
@@ -252,6 +254,8 @@ func dataToIncidentParam(data template.Data) IncidentParam {
 		AssignmentGroup:  config.DefaultIncident.AssignmentGroup,
 		CallerID:         config.ServiceNow.UserName,
 		Comments:         commentBuilder.String(),
+		Company:          config.DefaultIncident.Company,
+		ContactType:      config.DefaultIncident.ContactType,
 		Description:      descriptionBuilder.String(),
 		Impact:           config.DefaultIncident.Impact,
 		ShortDescription: shortDescriptionBuilder.String(),

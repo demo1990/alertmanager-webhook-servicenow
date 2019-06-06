@@ -20,8 +20,10 @@ const (
 // IncidentParam is a model of the managed incident paramters
 type IncidentParam struct {
 	AssignmentGroup  string
+	ContactType      string
 	CallerID         string
 	Comments         string
+	Company          string
 	Description      string
 	GroupKey         string
 	Impact           json.Number
@@ -74,8 +76,10 @@ func (ir IncidentsResponse) GetResults() []Incident {
 func NewIncident(param IncidentParam, groupKeyField string) Incident {
 	incident := Incident{
 		"assignment_group":  param.AssignmentGroup,
+		"contact_type":      param.ContactType,
 		"caller_id":         param.CallerID,
 		"comments":          param.Comments,
+		"company":           param.Company,
 		"description":       param.Description,
 		"impact":            param.Impact,
 		"short_description": param.ShortDescription,
