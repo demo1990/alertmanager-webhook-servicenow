@@ -208,7 +208,7 @@ func onFiringGroup(data template.Data, incident Incident) error {
 func onResolvedGroup(data template.Data, incident Incident) error {
 	incidentParam := dataToIncidentParam(data)
 	if incident == nil {
-		log.Warnf("Found no existing incident for resolved alert group key: %s. Do nothing.", getGroupKey(data))
+		log.Errorf("Found no existing incident for resolved alert group key: %s. No incident will be created/updated.", getGroupKey(data))
 	} else {
 		log.Infof("Found existing incident (%s), with state %s, for resolved alert group key: %s", incident.GetNumber(), incident.GetState(), getGroupKey(data))
 		if _, err := serviceNow.UpdateIncident(incidentParam, incident.GetSysID()); err != nil {
