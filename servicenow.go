@@ -46,8 +46,8 @@ func (i Incident) GetNumber() string {
 }
 
 // GetState returns the state of the incident
-func (i Incident) GetState() string {
-	return i["state"].(string)
+func (i Incident) GetState() json.Number {
+	return json.Number(i["state"].(string))
 }
 
 // IncidentResponse is a model of an API response contaning one incident

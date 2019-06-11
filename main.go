@@ -32,11 +32,11 @@ type Config struct {
 
 // ServiceNowConfig - ServiceNow instance configuration
 type ServiceNowConfig struct {
-	InstanceName          string   `yaml:"instance_name"`
-	UserName              string   `yaml:"user_name"`
-	Password              string   `yaml:"password"`
-	IncidentGroupKeyField string   `yaml:"incident_group_key_field"`
-	NoUpdateStates        []string `yaml:"no_update_states"`
+	InstanceName          string        `yaml:"instance_name"`
+	UserName              string        `yaml:"user_name"`
+	Password              string        `yaml:"password"`
+	IncidentGroupKeyField string        `yaml:"incident_group_key_field"`
+	NoUpdateStates        []json.Number `yaml:"no_update_states"`
 }
 
 // DefaultIncidentConfig - Default configuration for an incident
@@ -83,8 +83,8 @@ func main() {
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
-	config = loadConfig(*configFile)
-	createSnClient(config)
+	loadConfig(*configFile)
+	loadSnClient()
 
 	log.Info("Starting webhook", version.Info())
 	log.Info("Build context", version.BuildContext())
@@ -124,7 +124,7 @@ func readRequestBody(r *http.Request) (template.Data, error) {
 }
 
 func loadConfig(configFile string) Config {
-	config := Config{}
+	config = Config{}
 
 	// Load the config from the file
 	configData, err := ioutil.ReadFile(configFile)
@@ -141,7 +141,7 @@ func loadConfig(configFile string) Config {
 	return config
 }
 
-func createSnClient(config Config) ServiceNow {
+func loadSnClient() ServiceNow {
 	var err error
 	serviceNow, err = NewServiceNowClient(config.ServiceNow.InstanceName, config.ServiceNow.UserName, config.ServiceNow.Password, config.ServiceNow.IncidentGroupKeyField)
 	if err != nil {
@@ -192,7 +192,7 @@ func onFiringGroup(data template.Data, incident Incident) error {
 		}
 	} else {
 		log.Infof("Found existing incident (%s), with state %s, for firing alert group key: %s", incident.GetNumber(), incident.GetState(), getGroupKey(data))
-		if stringInSlice(incident.GetState(), config.ServiceNow.NoUpdateStates) {
+		if jsonNumberInSlice(incident.GetState(), config.ServiceNow.NoUpdateStates) {
 			if _, err := serviceNow.CreateIncident(incidentParam); err != nil {
 				return err
 			}
@@ -270,7 +270,7 @@ func getGroupKey(data template.Data) string {
 	return fmt.Sprintf("%v", data.GroupLabels.SortedPairs())
 }
 
-func stringInSlice(n string, list []string) bool {
+func jsonNumberInSlice(n json.Number, list []json.Number) bool {
 	for _, b := range list {
 		if b == n {
 			return true
