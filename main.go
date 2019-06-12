@@ -193,7 +193,7 @@ func onFiringGroup(data template.Data, incident Incident) error {
 		}
 	} else {
 		log.Infof("Found existing incident (%s), with state %s, for firing alert group key: %s", incident.GetNumber(), incident.GetState(), getGroupKey(data))
-		if jsonNumberInSlice(incident.GetState(), config.ServiceNow.NoUpdateStates) {
+		if isJSONNumberInSlice(incident.GetState(), config.ServiceNow.NoUpdateStates) {
 			if _, err := serviceNow.CreateIncident(incidentParam); err != nil {
 				return err
 			}
@@ -271,7 +271,7 @@ func getGroupKey(data template.Data) string {
 	return fmt.Sprintf("%v", data.GroupLabels.SortedPairs())
 }
 
-func jsonNumberInSlice(n json.Number, list []json.Number) bool {
+func isJSONNumberInSlice(n json.Number, list []json.Number) bool {
 	for _, b := range list {
 		if b == n {
 			return true
