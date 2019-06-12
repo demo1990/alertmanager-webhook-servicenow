@@ -167,9 +167,10 @@ func onAlertGroup(data template.Data) error {
 	var incident Incident
 	if len(incidents) > 0 {
 		incident = incidents[0]
-	}
-	if len(incidents) > 1 {
-		log.Warnf("Found multiple existing incidents for alert group key: %s. Will use first one.", getGroupKey(data))
+
+		if len(incidents) > 1 {
+			log.Warnf("Found multiple existing incidents for alert group key: %s. Will use first one.", getGroupKey(data))
+		}
 	}
 
 	if data.Status == "firing" {
