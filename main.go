@@ -185,7 +185,7 @@ func onAlertGroup(data template.Data) error {
 }
 
 func onFiringGroup(data template.Data, incident Incident) error {
-	incidentParam := dataToIncidentParam(data)
+	incidentParam := alertGroupToIncidentParam(data)
 	if incident == nil {
 		log.Infof("Found no existing incident for firing alert group key: %s", getGroupKey(data))
 		if _, err := serviceNow.CreateIncident(incidentParam); err != nil {
@@ -207,7 +207,7 @@ func onFiringGroup(data template.Data, incident Incident) error {
 }
 
 func onResolvedGroup(data template.Data, incident Incident) error {
-	incidentParam := dataToIncidentParam(data)
+	incidentParam := alertGroupToIncidentParam(data)
 	if incident == nil {
 		log.Errorf("Found no existing incident for resolved alert group key: %s. No incident will be created/updated.", getGroupKey(data))
 	} else {
@@ -219,7 +219,7 @@ func onResolvedGroup(data template.Data, incident Incident) error {
 	return nil
 }
 
-func dataToIncidentParam(data template.Data) IncidentParam {
+func alertGroupToIncidentParam(data template.Data) IncidentParam {
 
 	var shortDescriptionBuilder strings.Builder
 	shortDescriptionBuilder.WriteString(fmt.Sprintf("[%s] ", data.Status))
