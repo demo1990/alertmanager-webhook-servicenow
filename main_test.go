@@ -53,12 +53,10 @@ func TestWebhookHandler_Firing_DoNotExists_OK(t *testing.T) {
 	// Test the handler with the request and record the result
 	handler.ServeHTTP(rr, req)
 
-	// Check the status code
 	if status := rr.Code; status != http.StatusOK {
 		t.Errorf("Wrong status code: got %v, want %v", status, http.StatusOK)
 	}
 
-	// Check the response body
 	expected := `{"Status":200,"Message":"Success"}`
 	if rr.Body.String() != expected {
 		t.Errorf("Unexpected body: got %v, want %v", rr.Body.String(), expected)
@@ -89,12 +87,112 @@ func TestWebhookHandler_Firing_Exists_Create_OK(t *testing.T) {
 	// Test the handler with the request and record the result
 	handler.ServeHTTP(rr, req)
 
-	// Check the status code
 	if status := rr.Code; status != http.StatusOK {
 		t.Errorf("Wrong status code: got %v, want %v", status, http.StatusOK)
 	}
 
-	// Check the response body
+	expected := `{"Status":200,"Message":"Success"}`
+	if rr.Body.String() != expected {
+		t.Errorf("Unexpected body: got %v, want %v", rr.Body.String(), expected)
+	}
+}
+
+func TestWebhookHandler_Firing_Exists_Update_OK(t *testing.T) {
+	loadConfig("config/servicenow_example.yml")
+	snClientMock := new(MockedSnClient)
+	serviceNow = snClientMock
+	snClientMock.On("GetIncidents", mock.Anything).Return([]Incident{Incident{"state": "1", "number": "INC42", "sys_id": "42"}}, nil)
+	snClientMock.On("CreateIncident", mock.Anything).Return(Incident{}, errors.New("Create should not be called"))
+	snClientMock.On("UpdateIncident", mock.Anything, mock.Anything).Return(Incident{}, nil)
+
+	// Load a simple example of a body coming from AlertManager
+	data, err := ioutil.ReadFile("test/alertmanager_firing.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a request to pass to the handler
+	req := httptest.NewRequest("GET", "/webhook", bytes.NewReader(data))
+
+	// Create a ResponseRecorder (which satisfies http.ResponseWriter) to record the response
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(webhook)
+
+	// Test the handler with the request and record the result
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Wrong status code: got %v, want %v", status, http.StatusOK)
+	}
+
+	expected := `{"Status":200,"Message":"Success"}`
+	if rr.Body.String() != expected {
+		t.Errorf("Unexpected body: got %v, want %v", rr.Body.String(), expected)
+	}
+}
+
+func TestWebhookHandler_Resolved_DoNotExists_OK(t *testing.T) {
+	loadConfig("config/servicenow_example.yml")
+	snClientMock := new(MockedSnClient)
+	serviceNow = snClientMock
+	snClientMock.On("GetIncidents", mock.Anything).Return([]Incident{}, nil)
+	snClientMock.On("CreateIncident", mock.Anything).Return(Incident{}, errors.New("Create should not be called"))
+	snClientMock.On("UpdateIncident", mock.Anything, mock.Anything).Return(Incident{}, errors.New("Update should not be called"))
+
+	// Load a simple example of a body coming from AlertManager
+	data, err := ioutil.ReadFile("test/alertmanager_resolved.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a request to pass to the handler
+	req := httptest.NewRequest("GET", "/webhook", bytes.NewReader(data))
+
+	// Create a ResponseRecorder (which satisfies http.ResponseWriter) to record the response
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(webhook)
+
+	// Test the handler with the request and record the result
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Wrong status code: got %v, want %v", status, http.StatusOK)
+	}
+
+	expected := `{"Status":200,"Message":"Success"}`
+	if rr.Body.String() != expected {
+		t.Errorf("Unexpected body: got %v, want %v", rr.Body.String(), expected)
+	}
+}
+
+func TestWebhookHandler_Resolved_Exists_OK(t *testing.T) {
+	loadConfig("config/servicenow_example.yml")
+	snClientMock := new(MockedSnClient)
+	serviceNow = snClientMock
+	snClientMock.On("GetIncidents", mock.Anything).Return([]Incident{Incident{"state": "7", "number": "INC42", "sys_id": "42"}}, nil)
+	snClientMock.On("CreateIncident", mock.Anything).Return(Incident{}, errors.New("Create should not be called"))
+	snClientMock.On("UpdateIncident", mock.Anything, mock.Anything).Return(Incident{}, nil)
+
+	// Load a simple example of a body coming from AlertManager
+	data, err := ioutil.ReadFile("test/alertmanager_resolved.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a request to pass to the handler
+	req := httptest.NewRequest("GET", "/webhook", bytes.NewReader(data))
+
+	// Create a ResponseRecorder (which satisfies http.ResponseWriter) to record the response
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(webhook)
+
+	// Test the handler with the request and record the result
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Wrong status code: got %v, want %v", status, http.StatusOK)
+	}
+
 	expected := `{"Status":200,"Message":"Success"}`
 	if rr.Body.String() != expected {
 		t.Errorf("Unexpected body: got %v, want %v", rr.Body.String(), expected)
@@ -114,12 +212,10 @@ func TestWebhookHandler_BadRequest(t *testing.T) {
 	// Test the handler with the request and record the result
 	handler.ServeHTTP(rr, req)
 
-	// Check the status code
 	if status := rr.Code; status != http.StatusBadRequest {
 		t.Errorf("Wrong status code: got %v, want %v", status, http.StatusBadRequest)
 	}
 
-	// Check the response body
 	expected := `{"Status":400,"Message":"EOF"}`
 	if rr.Body.String() != expected {
 		t.Errorf("Unexpected body: got %v, want %v", rr.Body.String(), expected)
@@ -149,7 +245,6 @@ func TestWebhookHandler_InternalServerError(t *testing.T) {
 	// Test the handler with the request and record the result
 	handler.ServeHTTP(rr, req)
 
-	// Check the status code
 	if status := rr.Code; status != http.StatusInternalServerError {
 		t.Errorf("Wrong status code: got %v, want %v", status, http.StatusInternalServerError)
 	}
