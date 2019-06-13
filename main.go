@@ -84,8 +84,15 @@ func main() {
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
-	loadConfig(*configFile)
-	loadSnClient()
+	_, err := loadConfig(*configFile)
+	if err != nil {
+		log.Fatalf("Error loading config file: %v", err)
+	}
+
+	_, err = loadSnClient()
+	if err != nil {
+		log.Fatalf("Error loading ServiceNow client: %v", err)
+	}
 
 	log.Info("Starting webhook", version.Info())
 	log.Info("Build context", version.BuildContext())
@@ -124,18 +131,18 @@ func readRequestBody(r *http.Request) (template.Data, error) {
 	return data, err
 }
 
-func loadConfig(configFile string) Config {
+func loadConfig(configFile string) (Config, error) {
 	config = Config{}
 
 	// Load the config from the file
 	configData, err := ioutil.ReadFile(configFile)
 	if err != nil {
-		log.Fatalf("Error reading config file: %v", err)
+		return config, err
 	}
 
 	errYAML := yaml.Unmarshal([]byte(configData), &config)
 	if errYAML != nil {
-		log.Fatalf("Error unmarshalling config file: %v", errYAML)
+		return config, err
 	}
 
 	// Load internal state from config
@@ -145,16 +152,16 @@ func loadConfig(configFile string) Config {
 	}
 
 	log.Info("ServiceNow config loaded")
-	return config
+	return config, nil
 }
 
-func loadSnClient() ServiceNow {
+func loadSnClient() (ServiceNow, error) {
 	var err error
 	serviceNow, err = NewServiceNowClient(config.ServiceNow.InstanceName, config.ServiceNow.UserName, config.ServiceNow.Password, config.ServiceNow.IncidentGroupKeyField)
 	if err != nil {
-		log.Fatalf("Error creating the ServiceNow client: %v", err)
+		return serviceNow, err
 	}
-	return serviceNow
+	return serviceNow, nil
 }
 
 func onAlertGroup(data template.Data) error {
