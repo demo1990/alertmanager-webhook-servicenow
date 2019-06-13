@@ -7,13 +7,18 @@ A [Prometheus AlertManager](https://github.com/prometheus/alertmanager) webhook 
 ### ServiceNow authentication
 The supported authentication to ServiceNow is through a service account (basic authentication through HTTPS).
 
-### Creation of incident by group of alerts
+### Creation of incident by alert group
 One incident is created per distinct group key — as defined by the [`group_by`](https://prometheus.io/docs/alerting/configuration/#<route>) parameter of Alertmanager's `route` configuration section. This avoid spamming ServiceNow with incidents when a huge system failure occurs, and still provide a very flexible mechanism to group alerts in one incident.
 
-Currently, each AlertManager's notification group to the webhook will create a new incident, so configure the [`repeat_interval`](https://prometheus.io/docs/alerting/configuration/#<route>) accordingly.
+### Incident management workflow
+The supported incident workflow is the following:
+- Create a new incident if a firing alert group is currently not associated to an existing incident, or if an associated incident exists but is in a state where update is not allowed (this is configurable in the webhook, but will usually be `closed` or `resolved` state)
+- Update an existing incident if the status of the alert group is resolved, or if a firing alert group occurs and is in a state where update is allowed.
+
+Note that when an incident is updated, data fields are updated (description, comments, etc...), but incident state is not changed. In the future, an optional auto-resolve feature may be added to move an incident to `resolved` state when the alert group has a resolved status.
 
 ## Planned features
-- Update an existing incident if it already exists, for both firing and resolved status
+- Support more ServiceNow incident fields
 - Provide more advanced incident configuration (fields override, fields templating, etc...)
 
 ## Getting Started
@@ -69,6 +74,10 @@ service_now:
   instance_name: "<instance name>"
   user_name: "<user>"
   password: "<password>"
+  # Name of an existing ServiceNow table field that will be used as a key to uniquely reference an alert group in incident management workflow
+  incident_group_key_field: "<incident table field>"
+  # ID if the incident states for which existing incident will not be updated on firing alert group; leading to the creation of a new incident
+  no_update_states: [6,7]
 
 default_incident:
   # Sysid or name of the assignment group
