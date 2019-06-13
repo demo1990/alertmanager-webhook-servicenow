@@ -18,10 +18,11 @@ import (
 )
 
 var (
-	configFile    = kingpin.Flag("config.file", "ServiceNow configuration file.").Default("config/servicenow.yml").String()
-	listenAddress = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests.").Default(":9877").String()
-	config        Config
-	serviceNow    ServiceNow
+	configFile     = kingpin.Flag("config.file", "ServiceNow configuration file.").Default("config/servicenow.yml").String()
+	listenAddress  = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests.").Default(":9877").String()
+	config         Config
+	serviceNow     ServiceNow
+	noUpdateStates map[json.Number]bool
 )
 
 // Config - ServiceNow webhook configuration
@@ -137,6 +138,12 @@ func loadConfig(configFile string) Config {
 		log.Fatalf("Error unmarshalling config file: %v", errYAML)
 	}
 
+	// Load internal state from config
+	noUpdateStates = make(map[json.Number]bool, len(config.ServiceNow.NoUpdateStates))
+	for _, s := range config.ServiceNow.NoUpdateStates {
+		noUpdateStates[s] = true
+	}
+
 	log.Info("ServiceNow config loaded")
 	return config
 }
@@ -193,7 +200,7 @@ func onFiringGroup(data template.Data, incident Incident) error {
 		}
 	} else {
 		log.Infof("Found existing incident (%s), with state %s, for firing alert group key: %s", incident.GetNumber(), incident.GetState(), getGroupKey(data))
-		if isJSONNumberInSlice(incident.GetState(), config.ServiceNow.NoUpdateStates) {
+		if noUpdateStates[incident.GetState()] {
 			if _, err := serviceNow.CreateIncident(incidentParam); err != nil {
 				return err
 			}
@@ -269,13 +276,4 @@ func alertGroupToIncidentParam(data template.Data) IncidentParam {
 
 func getGroupKey(data template.Data) string {
 	return fmt.Sprintf("%v", data.GroupLabels.SortedPairs())
-}
-
-func isJSONNumberInSlice(n json.Number, list []json.Number) bool {
-	for _, b := range list {
-		if b == n {
-			return true
-		}
-	}
-	return false
 }
