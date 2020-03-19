@@ -1,10 +1,10 @@
 service_now:
-  instance_name: "CHANGE_ME"
-  user_name: "CHANGE_ME"
-  password: "CHANGE_ME"
+  instance_name: "dev17652"
+  user_name: "prometheus_integration"
+  password: "Tata@1234"
 
 workflow:
-  incident_group_key_field: "CHANGE_ME"
+  incident_group_key_field: "short_description"
   no_update_states: [6,7,8]
   incident_update_fields: ["comments"]
 
