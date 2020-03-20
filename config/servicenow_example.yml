@@ -1,7 +1,7 @@
 service_now:
-  instance_name: "dev17652"
+  instance_name: ""
   user_name: "prometheus_integration"
-  password: "Tata@1234"
+  password: ""
 
 workflow:
   incident_group_key_field: "short_description"
